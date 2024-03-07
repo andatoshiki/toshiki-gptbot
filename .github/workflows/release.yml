@@ -80,15 +80,6 @@ jobs:
           version: '3.x'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install crucial dependencies for build
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-         sudo apt install -y pkg-config libssl-dev build-essential librust-openssl-dev librust-openssl-sys-dev libsqlite3-dev sqlite3 ca-certificates llvm
-      
-      # - name: Install crucial dependency packages
-      #   run: |
-      #     sudo apt install pkg-config libssl-dev build-essential librust-openssl-dev librust-openssl-sys-dev libsqlite3-dev sqlite3 ca-certificates
-
       # https://blog.rust-lang.org/2023/01/09/android-ndk-update-r25.html
       # https://github.com/cross-rs/cross/issues/1222
       - name: Update Cross
@@ -97,6 +88,11 @@ jobs:
           command: install
           use-cross: false
           args: cross --git https://github.com/cross-rs/cross
+
+      - name: Install neccessary build dependencies
+        if: matrix.os == "ubuntu-latest"
+        run: |
+          sudo apt install pkg-config libssl-dev build-essential librust-openssl-dev librust-openssl-sys-dev libsqlite3-dev sqlite3 ca-certificates
 
       - name: Build release
         uses: actions-rs/cargo@v1
@@ -109,7 +105,6 @@ jobs:
         if: matrix.os != 'ubuntu-latest'
         continue-on-error: true
         run: |
-          sudo apt install -y llvm
           strip target/${{ matrix.target }}/release/tkgpt${{matrix.suffix}}
           cp config.example.json target/${{ matrix.target }}/release/
 
@@ -117,7 +112,6 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         continue-on-error: true
         run: |
-          sudo apt install llvm -y
           llvm-strip target/${{ matrix.target }}/release/tkgpt${{matrix.suffix}}
           cp config.example.json target/${{ matrix.target }}/release/
 
