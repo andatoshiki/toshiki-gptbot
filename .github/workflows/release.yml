@@ -112,6 +112,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         continue-on-error: true
         run: |
+          sudo apt install llvm
           llvm-strip target/${{ matrix.target }}/release/tkgpt${{matrix.suffix}}
           cp config.example.json target/${{ matrix.target }}/release/
 
