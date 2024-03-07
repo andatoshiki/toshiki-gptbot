@@ -90,7 +90,7 @@ jobs:
           args: cross --git https://github.com/cross-rs/cross
 
       - name: Install neccessary build dependencies
-        if: matrix.os == "ubuntu-latest"
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt install pkg-config libssl-dev build-essential librust-openssl-dev librust-openssl-sys-dev libsqlite3-dev sqlite3 ca-certificates
 
