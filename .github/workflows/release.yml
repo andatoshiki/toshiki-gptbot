@@ -79,6 +79,11 @@ jobs:
         with:
           version: '3.x'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install crucial dependencies for build
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+         sudo apt install -y pkg-config libssl-dev build-essential librust-openssl-dev librust-openssl-sys-dev libsqlite3-dev sqlite3 ca-certificates llvm
       
       # - name: Install crucial dependency packages
       #   run: |
@@ -104,7 +109,7 @@ jobs:
         if: matrix.os != 'ubuntu-latest'
         continue-on-error: true
         run: |
-          sudo apt install -y pkg-config libssl-dev build-essential librust-openssl-dev librust-openssl-sys-dev libsqlite3-dev sqlite3 ca-certificates llvm
+          sudo apt install -y llvm
           strip target/${{ matrix.target }}/release/tkgpt${{matrix.suffix}}
           cp config.example.json target/${{ matrix.target }}/release/
 
@@ -112,7 +117,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         continue-on-error: true
         run: |
-          sudo apt install -y pkg-config libssl-dev build-essential librust-openssl-dev librust-openssl-sys-dev libsqlite3-dev sqlite3 ca-certificates llvm
+          sudo apt install llvm -y
           llvm-strip target/${{ matrix.target }}/release/tkgpt${{matrix.suffix}}
           cp config.example.json target/${{ matrix.target }}/release/
 
