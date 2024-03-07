@@ -1,0 +1,170 @@
+name: Build and Release toshiki-gptbot
+
+on:
+  push:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Cross build for ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            suffix: ""
+            use-cross: true
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            suffix: ""
+            use-cross: true
+          - os: ubuntu-latest
+            target: aarch64-linux-android
+            suffix: ""
+            use-cross: true
+            cargo-flags: ""
+          # 32bit
+          - os: ubuntu-latest
+            target: armv7-linux-androideabi
+            suffix: ""
+            use-cross: true
+            cargo-flags: ""
+
+          - os: ubuntu-latest
+            target: armv7-unknown-linux-musleabihf
+            suffix: ""
+            use-cross: true
+            cargo-flags: ""
+
+          # - os: macos-latest
+          #   target: x86_64-apple-darwin
+          #   suffix: ""
+          #   use-cross: false
+          #   cargo-flags: ""
+          # - os: macos-latest
+          #   target: aarch64-apple-darwin
+          #   suffix: ""
+          #   use-cross: true
+          #   cargo-flags: ""
+
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            suffix: .exe
+            use-cross: false
+            cargo-flags: ""
+          # - os: windows-latest
+          #   target: x86_64-pc-windows-gnu
+          #   suffix: .exe
+          #   use-cross: false
+          #   cargo-flags: ""
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          override: true
+          profile: minimal
+          toolchain: stable
+          target: ${{ matrix.target }}
+
+      - name: Install Protoc
+        if: matrix.os == 'windows-latest'
+        uses: arduino/setup-protoc@v1
+        with:
+          version: '3.x'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Install crucial dependency packages
+        run: |
+          sudo apt install pkg-config libssl-dev build-essential librust-openssl-dev librust-openssl-sys-dev libsqlite3-dev sqlite3 ca-certificates
+
+      # https://blog.rust-lang.org/2023/01/09/android-ndk-update-r25.html
+      # https://github.com/cross-rs/cross/issues/1222
+      - name: Update Cross
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          use-cross: false
+          args: cross --git https://github.com/cross-rs/cross
+
+      - name: Build release
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          use-cross: ${{ matrix.use-cross }}
+          args: --locked --release --target=${{ matrix.target }}
+
+      - name: Strip (MacOS/Window)
+        if: matrix.os != 'ubuntu-latest'
+        continue-on-error: true
+        run: |
+          strip target/${{ matrix.target }}/release/tkgpt${{matrix.suffix}}
+          cp config.example.json target/${{ matrix.target }}/release/
+
+      - name: LLVM Strip (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        continue-on-error: true
+        run: |
+          sudo apt-get install -y llvm 
+          llvm-strip target/${{ matrix.target }}/release/tkgpt${{matrix.suffix}}
+          cp config.example.json target/${{ matrix.target }}/release/
+
+      - name: Compress binaries
+        # Upx may not support some platforms. Ignore the errors
+        continue-on-error: true
+        # Disable upx for mips. See https://github.com/upx/upx/issues/387
+        if: true && !contains(matrix.target, 'mips')
+        uses: svenstaro/upx-action@v2
+        with:
+          strip: false
+          args: -q --best --lzma
+          files: |
+            target/${{ matrix.target }}/release/tkgpt${{matrix.suffix}}
+            cp config.example.json target/${{ matrix.target }}/release/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tkgpt-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/release/tkgpt${{matrix.suffix}}
+            target/${{ matrix.target }}/release/config.example.json
+
+
+      - name: Zip Release For tkgpt (Linux)
+        if: matrix.os == 'ubuntu-latest' && contains(matrix.target, 'linux')
+        uses: TheDoctor0/zip-release@0.7.6
+        with:
+          type: zip
+          filename: tkgpt-${{ matrix.target }}.zip
+          directory: target/${{ matrix.target }}/release/
+          path: |
+            tkgpt${{matrix.suffix}}
+            config.example.json
+
+      - name: Zip Release For tkgpt (MacOS/Window)
+        if: true && !contains(matrix.target, 'linux')
+        uses: TheDoctor0/zip-release@0.7.6
+        with:
+          type: zip
+          filename: tkgpt-${{ matrix.target }}.zip
+          directory: target/${{ matrix.target }}/release/
+          path: |
+            tkgpt${{matrix.suffix}}
+            config.example.json
+
+      - name: Publish
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: |
+            target/${{ matrix.target }}/release/tkgpt-${{ matrix.target }}.zip
+          generate_release_notes: true
+          draft: true

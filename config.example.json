@@ -1,0 +1,12 @@
+{
+    "openaiAPIKey": "sk-***",
+    "botToken": "1234567890:***",
+    "conversationLimit": 16,
+    "databasePath": "./data.db",
+    "adminUsernames": [
+        "username"
+    ],
+    "i18n": {
+        "resetPrompt": "The current conversation session has been completely inacativated and cleared!"
+    }
+}
